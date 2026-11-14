@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset="utf-8"><title>E se a vida tivesse LAG</title>
+<style>@font-face{font-family:"Lilita One";src:url(fonts/LilitaOne.woff2) format("woff2")}html,body{margin:0;background:#111}canvas{display:block}</style>
+</head><body><canvas id="c" width="1080" height="1920"></canvas>
+<script src="tl.js"></script><script src="core.js"></script><script src="rig.js"></script><script src="sets.js"></script>
+<script src="ui.js"></script><script src="shots.js"></script>
+<script>
+(function () {
+  const ctx = document.getElementById('c').getContext('2d');
+  const { key, ease, clamp } = G;
+  function shake(t) {
+    let x = 0, y = 0;
+    for (const [h, a] of G.HITS) {
+      const d = t - h;
+      if (d < 0 || d > 0.35) continue;
+      const f = Math.pow(1 - d / 0.35, 2);
+      x += a * f * Math.sin(d * 95); y += a * f * Math.cos(d * 77);
+    }
+    return [x, y];
+  }
+  function drawScene(t) {
+    const sh = G.SHOTS.find(s => t >= s.t0 && t < s.t1) || G.SHOTS[G.SHOTS.length - 1];
+    const [cx, cy, z] = key(t, sh.cam.map(([kt, ...v]) => [kt, v]));
+    const [sx, sy] = shake(t);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 1080, 1920);
+    ctx.translate(540 + sx, 960 + sy); ctx.scale(z, z); ctx.translate(-cx, -cy);
+    sh.world(ctx, t);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (sh.over) sh.over(ctx, t);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // game UI on top of the world
+    if (t >= G.A.l2 - 0.06) G.ui.chips(ctx, t, G.clock(t), G.A.l2 - 0.06);
+    G.ui.chat(ctx, t, G.CHAT);
+    G.ui.hud(ctx, t, G.hudState(t));
+    for (const [t0, d, m, c, i] of G.TOASTS) G.ui.toast(ctx, t, t0, d, m, c, i);
+    for (const [label, t0] of G.CARDS) G.ui.dayCard(ctx, t, label, t0);
+    G.ui.captions(ctx, t);
+  }
+  window.seek = function (t) {
+    if (t < G.TE) { drawScene(t); return; }
+    const k = clamp((t - G.TE) / (G.END - G.TE));
+    drawScene(G.TE * (1 - ease.inQ(k)) * 0.999);
+    G.ui.rewindOverlay(ctx, t, k);
+  };
+  window.END = G.END;
+  document.fonts.load('124px "Lilita One"').then(() => { window.seek(0); window.READY = true; });
+})();
+</script></body></html>
